@@ -1,8 +1,17 @@
 # Walkthrough for the echo challenge
 
-This is a basic buffer overflow using `gets()` and served remotely over xinetd.
+This is a basic buffer overflow using `gets()` and served remotely over xinetd. If you want to run the service on your own linux (I'm using kali), follow these steps (it's assumed that you cloned the repo to `/root/cyber-challenge-walkthrough`):
 
-The following is a walkthrough for the creation of the your exploit. There are plenty of tutorials available on the Internet which cover program execution, stack layout and function prolog and epilog. It is suggested that you consult Google if you are unfamiliar with basic stack layout.
+```
+root@kali:~# apt-get install xinetd
+Reading package lists... Done
+...
+[ ok ] Starting internet superserver: xinetd.
+root@kali:~# cp cyber-challenge-walkthrough/echo.xinetd /etc/xinetd.d/echo
+root@kali:~# service xinetd restart
+```
+
+The following is a walkthrough for the creation of the exploit. There are plenty of tutorials available online which cover program execution, stack layout and function prolog and epilog. It is suggested that you do some googling if you are unfamiliar with any of these concepts, particularly stack layout.
 
 Before starting I'd also recommended that you pull the gdbinit file at `https://github.com/Nildram/Gdbinit` with:
 

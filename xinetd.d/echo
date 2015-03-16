@@ -1,0 +1,12 @@
+service echo
+{
+    id          = echo
+    user        = root
+    server      = /root/cyber-challenge-walkthrough/echo
+    disable     = no
+    port        = 7
+    socket_type = stream
+    protocol    = tcp
+    wait        = no
+    type        = UNLISTED
+}
